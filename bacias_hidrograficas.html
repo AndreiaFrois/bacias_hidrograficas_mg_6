@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agências de Bacias Hidrográficas - MG</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #0066cc;
+            --secondary-color: #00a8e8;
+            --accent-color: #00c9ff;
+            --text-dark: #2c3e50;
+            --text-light: #34495e;
+            --bg-light: #f8f9fa;
+            --bg-white: #ffffff;
+            --shadow: 0 2px 10px rgba(0,0,0,0.1);
+            --shadow-hover: 0 5px 20px rgba(0,0,0,0.15);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: var(--text-dark);
+            background-color: var(--bg-light);
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent,
+                transparent 10px,
+                rgba(255,255,255,0.05) 10px,
+                rgba(255,255,255,0.05) 20px
+            );
+            animation: wave 20s linear infinite;
+        }
+
+        @keyframes wave {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Navigation */
+        .nav-container {
+            background: var(--bg-white);
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            padding: 0;
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .nav-item {
+            padding: 1rem 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            border-bottom: 3px solid transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-light);
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .nav-item.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .nav-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Main Content */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-white);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card h2 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card h3 {
+            color: var(--secondary-color);
+            margin-top: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Map Container */
+        .map-container {
+            background: var(--bg-white);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 8px;
+            z-index: 1;
+        }
+
+        .map-legend {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .map-legend h4 {
+            margin: 0 0 10px 0;
+            font-size: 16px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 8px;
+            border: 1px solid #999;
+            border-radius: 3px;
+        }
+
+        /* Agency Grid */
+        .agency-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .agency-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .agency-card:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .agency-card h4 {
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .agency-card p {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        /* Timeline */
+        .timeline {
+            position: relative;
+            padding: 2rem 0;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--secondary-color);
+            transform: translateX(-50%);
+        }
+
+        .timeline-item {
+            position: relative;
+            padding: 1rem;
+            width: calc(50% - 2rem);
+            margin-bottom: 2rem;
+        }
+
+        .timeline-item:nth-child(odd) {
+            margin-left: auto;
+            text-align: left;
+        }
+
+        .timeline-item:nth-child(even) {
+            margin-right: auto;
+            text-align: right;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: var(--accent-color);
+            border: 3px solid var(--secondary-color);
+            border-radius: 50%;
+            top: 1.5rem;
+        }
+
+        .timeline-item:nth-child(odd)::before {
+            left: -2.5rem;
+        }
+
+        .timeline-item:nth-child(even)::before {
+            right: -2.5rem;
+        }
+
+        .timeline-content {
+            background: var(--bg-white);
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .timeline-date {
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Basin Links */
+        .basin-links {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .basin-link {
+            background: var(--bg-white);
+            border: 2px solid var(--secondary-color);
+            border-radius: 8px;
+            padding: 1rem;
+            text-decoration: none;
+            color: var(--text-dark);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .basin-link:hover {
+            background: var(--secondary-color);
+            color: white;
+            transform: translateX(5px);
+        }
+
+        .basin-link::before {
+            content: '💧';
+            font-size: 1.5rem;
+        }
+
+        /* Info Box */
+        .info-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .info-box::before {
+            content: '💡';
+            position: absolute;
+            top: -20px;
+            right: -20px;
+            font-size: 100px;
+            opacity: 0.1;
+        }
+
+        .info-box h3 {
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        /* Performance Scale */
+        .performance-scale {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .scale-item {
+            background: var(--bg-white);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+        }
+
+        .scale-item:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .scale-item.otimo { border-left-color: #27ae60; }
+        .scale-item.bom { border-left-color: #3498db; }
+        .scale-item.regular { border-left-color: #f39c12; }
+        .scale-item.insuficiente { border-left-color: #e74c3c; }
+
+        .scale-item h4 {
+            margin-bottom: 0.5rem;
+        }
+
+        .scale-item p {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .header p {
+                font-size: 1rem;
+            }
+
+            .nav {
+                justify-content: flex-start;
+            }
+
+            .nav-item {
+                padding: 1rem;
+            }
+
+            .timeline::before {
+                left: 2rem;
+            }
+
+            .timeline-item {
+                width: calc(100% - 4rem);
+                margin-left: 4rem !important;
+                text-align: left !important;
+            }
+
+            .timeline-item::before {
+                left: -2.5rem !important;
+            }
+
+            #map {
+                height: 350px;
+            }
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>Agências de Bacias Hidrográficas</h1>
+        <p>Sistema de Gestão Integrada e Participativa dos Recursos Hídricos de Minas Gerais</p>
+    </header>
+
+    <nav class="nav-container">
+        <div class="nav">
+            <div class="nav-item active" onclick="showSection('visao-geral')">
+                <span class="nav-icon">🏛️</span> Visão Geral
+            </div>
+            <div class="nav-item" onclick="showSection('mapa')">
+                <span class="nav-icon">🗺️</span> Mapa Interativo
+            </div>
+            <div class="nav-item" onclick="showSection('atuacao')">
+                <span class="nav-icon">🎯</span> Atuação
+            </div>
+            <div class="nav-item" onclick="showSection('contrato')">
+                <span class="nav-icon">📄</span> Contrato de Gestão
+            </div>
+            <div class="nav-item" onclick="showSection('avaliacao')">
+                <span class="nav-icon">📊</span> Avaliação
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Visão Geral -->
+        <section id="visao-geral" class="section active">
+            <div class="card">
+                <h2>🏛️ O que são as Agências de Bacias?</h2>
+                <p>As agências de bacias hidrográficas são unidades executivas descentralizadas que integram o Sistema Estadual de Gerenciamento de Recursos Hídricos (SEGRH). Elas atuam de forma articulada com os comitês de bacia hidrográfica (CBHs) na gestão integrada e participativa dos recursos hídricos.</p>
+                
+                <h3>Principais Responsabilidades</h3>
+                <ul>
+                    <li>Administração dos recursos financeiros arrecadados com a cobrança pelo uso da água</li>
+                    <li>Aplicação dos recursos em ações para melhoria da qualidade hídrica</li>
+                    <li>Apoio técnico e administrativo aos comitês de bacia</li>
+                    <li>Garantia da disponibilidade hídrica na bacia</li>
+                </ul>
+            </div>
+
+            <div class="info-box">
+                <h3>Como são instituídas?</h3>
+                <p>As agências são instituídas mediante solicitação do CBH e autorização do Conselho Nacional ou Estadual de Recursos Hídricos (CNRH e CERH), conforme sua área de abrangência. Em Minas Gerais, ainda não foram criadas agências de bacias propriamente ditas, mas algumas entidades já foram autorizadas pelo CERH-MG para exercerem funções a elas inerentes, conforme prevê a Lei nº 13.199/1999.</p>
+            </div>
+        </section>
+
+        <!-- Mapa Interativo -->
+        <section id="mapa" class="section">
+            <div class="card">
+                <h2>🗺️ Mapa das Bacias Hidrográficas de Minas Gerais</h2>
+                <p>Visualize a distribuição geográfica das bacias hidrográficas e suas respectivas agências gestoras.</p>
+            </div>
+
+            <div class="map-container">
+                <div id="map"></div>
+            </div>
+
+            <div class="card">
+                <h3>Entidades Gestoras por Região</h3>
+                <div class="agency-grid">
+                    <div class="agency-card" onclick="highlightBasin('peixe-vivo')">
+                        <h4>Agência Peixe Vivo</h4>
+                        <p>Afluentes mineiros do Rio São Francisco</p>
+                    </div>
+                    <div class="agency-card" onclick="highlightBasin('abha')">
+                        <h4>ABHA Gestão de Águas</h4>
+                        <p>Bacias afluentes do Rio Paranaíba</p>
+                    </div>
+                    <div class="agency-card" onclick="highlightBasin('agevap')">
+                        <h4>AGEVAP</h4>
+                        <p>Rios Preto, Paraibuna, Pomba e Muriaé</p>
+                    </div>
+                    <div class="agency-card" onclick="highlightBasin('agedoce')">
+                        <h4>AGEDoce</h4>
+                        <p>Afluentes mineiros do Rio Doce</p>
+                    </div>
+                    <div class="agency-card" onclick="highlightBasin('agegrande')">
+                        <h4>AGEGrande</h4>
+                        <p>Afluentes mineiros do Rio Grande</p>
+                    </div>
+                    <div class="agency-card" onclick="highlightBasin('igam')">
+                        <h4>IGAM</h4>
+                        <p>Rios Piracicaba e Jaguari</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Atuação -->
+        <section id="atuacao" class="section">
+            <div class="card">
+                <h2>🎯 Atuação das Entidades</h2>
+                <p>As entidades equiparadas atuam apenas em circunscrições hidrográficas (CHs) que já implementaram a cobrança pelo uso dos recursos hídricos.</p>
+                
+                <h3>Histórico de Equiparações</h3>
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-date">2007</div>
+                            <p><strong>Agência Peixe Vivo</strong> - Primeira equiparação por solicitação do CBH do Rio Velhas</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-date">2007</div>
+                            <p><strong>ABHA Gestão de Águas</strong> - Equiparação por solicitação do CBH do Rio Araguari</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-content">
+                            <div class="timeline-date">Atualmente</div>
+                            <p><strong>30 CHs</strong> contam com atuação de entidades equiparadas em todo o estado</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Distribuição Atual</h3>
+                <p>Atualmente, todas as circunscrições hidrográficas mineiras têm a cobrança instituída e contam com o seguinte arranjo institucional:</p>
+                <ul>
+                    <li><strong>Agência Peixe Vivo:</strong> Bacias dos afluentes mineiros do Rio São Francisco</li>
+                    <li><strong>ABHA Gestão de Águas:</strong> Bacias afluentes do Rio Paranaíba</li>
+                    <li><strong>AGEVAP:</strong> Bacias dos Rios Preto e Paraibuna e dos Rios Pomba e Muriaé</li>
+                    <li><strong>AGEDoce (AGEVAP):</strong> Afluentes mineiros do Rio Doce</li>
+                    <li><strong>AGEGrande (AGEVAP):</strong> Afluentes mineiros do Rio Grande</li>
+                    <li><strong>IGAM:</strong> Bacia dos Rios Piracicaba e Jaguari</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Contrato de Gestão -->
+        <section id="contrato" class="section">
+            <div class="card">
+                <h2>📄 Contrato de Gestão</h2>
+                <p>Com o objetivo de viabilizar o repasse dos recursos arrecadados com a cobrança, a agência de bacia ou entidade equiparada celebra um Contrato de Gestão com o Estado de Minas Gerais, por meio do órgão gestor - Igam, e com a interveniência do CBH.</p>
+                
+                <h3>Características do Contrato</h3>
+                <ul>
+                    <li>Estipulação de metas e resultados a serem alcançados</li>
+                    <li>Definição de indicadores de desempenho</li>
+                    <li>Regulamentado pelo Decreto nº 49.023/2025</li>
+                    <li>Avaliação periódica do cumprimento das metas</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Bacias Hidrográficas por Circunscrição</h3>
+                <div class="basin-links">
+                    <a href="#" class="basin-link">Alto Paranaíba - CH PN1</a>
+                    <a href="#" class="basin-link">Rio Araguari - CH PN2</a>
+                    <a href="#" class="basin-link">Baixo Paranaíba - CH PN3</a>
+                    <a href="#" class="basin-link">Rio Pará - CH SF2</a>
+                    <a href="#" class="basin-link">Rio Paraopeba - CH SF3</a>
+                    <a href="#" class="basin-link">Rio das Velhas - CH SF5</a>
+                    <a href="#" class="basin-link">Rio Doce - CHs DO1 a DO6</a>
+                    <a href="#" class="basin-link">Preto e Paraíbuna - CH PS1</a>
+                    <a href="#" class="basin-link">Pomba e Muriaé - CH PS2</a>
+                    <a href="#" class="basin-link">Piracicaba e Jaguari - CH PJ1</a>
+                    <a href="#" class="basin-link">Rio Grande - CH GD1 a GD8</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Avaliação de Desempenho -->
+        <section id="avaliacao" class="section">
+            <div class="card">
+                <h2>📊 Avaliação de Desempenho</h2>
+                <p>O Programa de Trabalho, acordado entre as partes e anexado ao Contrato de Gestão, é o instrumento que permite avaliar o desempenho da agência ou da entidade equiparada no cumprimento dos compromissos pactuados.</p>
+                
+                <h3>Processo de Avaliação</h3>
+                <ul>
+                    <li>Envio anual do Relatório de Gestão</li>
+                    <li>Prestação de contas da aplicação dos recursos</li>
+                    <li>Monitoramento realizado por técnicos do Igam</li>
+                    <li>Classificação em escala conceitual</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <h3>Escala de Classificação</h3>
+                <div class="performance-scale">
+                    <div class="scale-item otimo">
+                        <h4>Ótimo</h4>
+                        <p>Nota geral ≥ 9</p>
+                    </div>
+                    <div class="scale-item bom">
+                        <h4>Bom</h4>
+                        <p>Nota geral ≥ 7 e < 9</p>
+                    </div>
+                    <div class="scale-item regular">
+                        <h4>Regular</h4>
+                        <p>Nota geral ≥ 5 e < 7</p>
+                    </div>
+                    <div class="scale-item insuficiente">
+                        <h4>Insuficiente</h4>
+                        <p>Nota geral < 5</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3>Histórico de Avaliações</h3>
+                <p>A média histórica das notas de avaliação é calculada até o exercício de 2023. O resultado de 2024 será apurado no exercício de 2025, garantindo transparência e tempo adequado para análise dos dados.</p>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Navigation
+        function showSection(sectionId) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active class from all nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionId).classList.add('active');
+            
+            // Add active class to clicked nav item
+            event.target.closest('.nav-item').classList.add('active');
+            
+            // Initialize map if showing map section
+            if (sectionId === 'mapa' && !window.mapInitialized) {
+                setTimeout(initMap, 100);
+                window.mapInitialized = true;
+            }
+        }
+
+        // Map initialization
+        let map;
+        let basinLayers = {};
+
+        function initMap() {
+            // Initialize the map
+            map = L.map('map').setView([-18.5122, -44.5550], 7);
+
+            // Add tile layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Define basin areas (simplified polygons for demonstration)
+            const basins = {
+                'peixe-vivo': {
+                    name: 'Agência Peixe Vivo',
+                    color: '#3498db',
+                    coords: [
+                        [-20.0, -46.0], [-20.0, -44.0], [-18.0, -44.0], [-18.0, -46.0]
+                    ]
+                },
+                'abha': {
+                    name: 'ABHA Gestão de Águas',
+                    color: '#e74c3c',
+                    coords: [
+                        [-19.0, -48.0], [-19.0, -46.0], [-17.0, -46.0], [-17.0, -48.0]
+                    ]
+                },
+                'agevap': {
+                    name: 'AGEVAP',
+                    color: '#2ecc71',
+                    coords: [
+                        [-21.5, -43.5], [-21.5, -42.0], [-20.5, -42.0], [-20.5, -43.5]
+                    ]
+                },
+                'agedoce': {
+                    name: 'AGEDoce',
+                    color: '#f39c12',
+                    coords: [
+                        [-19.5, -42.5], [-19.5, -41.0], [-18.5, -41.0], [-18.5, -42.5]
+                    ]
+                },
+                'agegrande': {
+                    name: 'AGEGrande',
+                    color: '#9b59b6',
+                    coords: [
+                        [-21.0, -45.5], [-21.0, -44.0], [-20.0, -44.0], [-20.0, -45.5]
+                    ]
+                },
+                'igam': {
+                    name: 'IGAM',
+                    color: '#1abc9c',
+                    coords: [
+                        [-20.0, -43.0], [-20.0, -42.0], [-19.0, -42.0], [-19.0, -43.0]
+                    ]
+                }
+            };
+
+            // Add basin polygons to map
+            for (const [key, basin] of Object.entries(basins)) {
+                const polygon = L.polygon(basin.coords, {
+                    color: basin.color,
+                    fillColor: basin.color,
+                    fillOpacity: 0.3,
+                    weight: 2
+                }).addTo(map);
+
+                polygon.bindPopup(`<strong>${basin.name}</strong>`);
+                basinLayers[key] = polygon;
+            }
+
+            // Add legend
+            const legend = L.control({position: 'bottomright'});
+            legend.onAdd = function(map) {
+                const div = L.DomUtil.create('div', 'map-legend');
+                div.innerHTML = '<h4>Entidades Gestoras</h4>';
+                
+                for (const [key, basin] of Object.entries(basins)) {
+                    div.innerHTML += `
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: ${basin.color}"></div>
+                            <span>${basin.name}</span>
+                        </div>
+                    `;
+                }
+                
+                return div;
+            };
+            legend.addTo(map);
+
+            // Add scale
+            L.control.scale({imperial: false}).addTo(map);
+        }
+
+        // Highlight basin on map
+        function highlightBasin(basinKey) {
+            if (!map || !basinLayers[basinKey]) return;
+            
+            // Reset all layers
+            Object.values(basinLayers).forEach(layer => {
+                layer.setStyle({fillOpacity: 0.3, weight: 2});
+            });
+            
+            // Highlight selected basin
+            basinLayers[basinKey].setStyle({fillOpacity: 0.6, weight: 4});
+            map.fitBounds(basinLayers[basinKey].getBounds());
+            
+            // Switch to map section
+            showSection('mapa');
+        }
+
+        // Smooth scroll for internal links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add loading animation to external links
+        document.querySelectorAll('.basin-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                this.innerHTML += ' <span class="loading"></span>';
+                // Simulate loading
+                setTimeout(() => {
+                    alert('Link para informações detalhadas da bacia (em desenvolvimento)');
+                    this.querySelector('.loading').remove();
+                }, 1000);
+            });
+        });
+    </script>
+</body>
+</html>
